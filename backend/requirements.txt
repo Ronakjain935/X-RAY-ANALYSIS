@@ -1,0 +1,43 @@
+# ===================================================================
+# X-RAY SQUARED — Backend dependencies
+# ===================================================================
+# Python 3.11+
+# Install with:  pip install -r requirements.txt
+#
+# Notes:
+# - PyTorch is required for model inference and Grad-CAM.
+# - CPU-only PyTorch is the default on Windows / non-CUDA machines.
+# - For GPU support, install torch + torchvision matching your CUDA version
+#   from https://pytorch.org/get-started/locally/ BEFORE running this file,
+#   or replace the two lines below with the CUDA-specific wheel index URL.
+# ===================================================================
+
+# --- Web framework ---
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+
+# --- Validation ---
+pydantic==2.10.4
+pydantic-settings==2.7.1
+
+# --- Database ---
+sqlalchemy==2.0.36
+
+# --- Image processing ---
+pillow==11.0.0
+opencv-python-headless==4.11.0.86
+numpy==2.2.1
+
+# --- ML ---
+torch>=2.5.1
+torchvision>=0.20.1
+keras>=3.0.0
+ml-dtypes
+
+# --- Testing ---
+pytest==8.3.4
+httpx==0.28.1
+
+# --- Misc ---
+python-dotenv==1.0.1

@@ -1,0 +1,13 @@
+{
+    "image_size": [
+        224,
+        224
+    ],
+    "classes": [
+        "NORMAL",
+        "PNEUMONIA"
+    ],
+    "pneumonia_threshold": 0.5,
+    "xray_threshold": 0.7,
+    "model": "EfficientNetB0"
+}
