@@ -35,16 +35,15 @@ async def lifespan(app: FastAPI):
     settings.ensure_directories()
     init_db()
     logger.info("Database initialized.")
-    prediction.load_model()
-    status = prediction.model_status()
-    if status["available"]:
-        logger.info("Model loaded on device=%s", status["device"])
-    else:
-        logger.warning("Model not available: %s", status["error"])
-        logger.warning(
-            "Backend will start, but /api/analyze will return HTTP 503 until "
-            "pneumonia_resnet18_best.pth is placed in trained_models/."
-        )
+    try:
+        prediction.load_model()
+        status = prediction.model_status()
+        if status["available"]:
+            logger.info("Model loaded on device=%s", status["device"])
+        else:
+            logger.warning("Model not available: %s", status["error"])
+    except Exception as e:
+        logger.exception("Model loading encountered error during startup (continuing): %s", e)
     yield
     logger.info("Shutting down X-RAY SQUARED backend.")
 

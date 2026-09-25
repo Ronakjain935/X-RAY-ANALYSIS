@@ -8,3 +8,5 @@ services:
     envVars:
       - key: CORS_ORIGINS
         value: "*"
+      - key: PORT
+        value: 10000

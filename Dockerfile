@@ -4,8 +4,7 @@ FROM python:3.11-slim
 # Prevent Python from writing .pyc and buffer stdout/stderr
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    KERAS_BACKEND=torch \
-    PORT=8000
+    KERAS_BACKEND=torch
 
 # Install system dependencies for OpenCV and image operations
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -31,7 +30,7 @@ COPY s_ray_config.json /s_ray_config.json
 # Ensure upload/result directories exist
 RUN mkdir -p uploads results trained_models models
 
-EXPOSE 8000
+EXPOSE 10000
 
-# Start Uvicorn bound to dynamic PORT assigned by host
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Start Uvicorn bound to dynamic PORT assigned by host (Render defaults to 10000)
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-10000}"]

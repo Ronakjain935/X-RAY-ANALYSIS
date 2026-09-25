@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 # Load .env from the backend/ directory (one level up from this file).
 # override=True so backend's .env takes precedence over any inherited env
 # (e.g., the Next.js project's DATABASE_URL must not leak in here).
-load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
+load_dotenv(Path(__file__).resolve().parent / ".env", override=False)
 
 
 # Set Keras backend to PyTorch before any keras import
@@ -58,7 +58,7 @@ class Settings:
 
     # Server
     HOST: str = os.getenv("HOST", "0.0.0.0")
-    PORT: int = int(os.getenv("PORT", "8000"))
+    PORT: int = int(os.getenv("PORT", "10000"))
 
     @property
     def BACKEND_ROOT(self) -> Path:
