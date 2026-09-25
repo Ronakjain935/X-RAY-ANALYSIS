@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Float, DateTime, Text
+from typing import Optional
+from sqlalchemy import Integer, String, Float, DateTime, Text
+from sqlalchemy.orm import Mapped, mapped_column
 
 from .database import Base
 
@@ -12,39 +14,39 @@ class Case(Base):
 
     __tablename__ = "cases"
 
-    id = Column(Integer, primary_key=True, index=True)
-    case_id = Column(String, unique=True, index=True, nullable=False)  # e.g. XR-000001
-    filename = Column(String, nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    case_id: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)  # e.g. XR-000001
+    filename: Mapped[str] = mapped_column(String, nullable=False)
 
     # File paths (relative to backend/ for portability)
-    original_image_path = Column(String, nullable=False)
-    gradcam_path = Column(String, nullable=True)
+    original_image_path: Mapped[str] = mapped_column(String, nullable=False)
+    gradcam_path: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     # AI output
-    prediction = Column(String, nullable=False)  # NORMAL | PNEUMONIA
-    score = Column(Float, nullable=False)         # raw model score (0..1)
-    confidence = Column(String, nullable=False)  # HIGH | MEDIUM | LOW
-    uncertainty = Column(Float, nullable=False, default=0.0)  # 1 - max(prob)
-    prob_normal = Column(Float, nullable=True)   # P(NORMAL)
-    prob_pneumonia = Column(Float, nullable=True)  # P(PNEUMONIA)
-    priority = Column(String, nullable=False)    # HIGH | MEDIUM | LOW
+    prediction: Mapped[str] = mapped_column(String, nullable=False)  # NORMAL | PNEUMONIA
+    score: Mapped[float] = mapped_column(Float, nullable=False)         # raw model score (0..1)
+    confidence: Mapped[str] = mapped_column(String, nullable=False)  # HIGH | MEDIUM | LOW
+    uncertainty: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)  # 1 - max(prob)
+    prob_normal: Mapped[Optional[float]] = mapped_column(Float, nullable=True)   # P(NORMAL)
+    prob_pneumonia: Mapped[Optional[float]] = mapped_column(Float, nullable=True)  # P(PNEUMONIA)
+    priority: Mapped[str] = mapped_column(String, nullable=False)    # HIGH | MEDIUM | LOW
 
     # Image quality
-    quality_status = Column(String, nullable=False)   # GOOD | WARNING | POOR
-    brightness_status = Column(String, nullable=False)
-    contrast_status = Column(String, nullable=False)
-    resolution_status = Column(String, nullable=False)
+    quality_status: Mapped[str] = mapped_column(String, nullable=False)   # GOOD | WARNING | POOR
+    brightness_status: Mapped[str] = mapped_column(String, nullable=False)
+    contrast_status: Mapped[str] = mapped_column(String, nullable=False)
+    resolution_status: Mapped[str] = mapped_column(String, nullable=False)
 
     # Human review
-    review_status = Column(String, nullable=False, default="PENDING")  # PENDING | REVIEWED
-    human_decision = Column(String, nullable=True)  # AGREE_WITH_AI | DISAGREE_WITH_AI | NEEDS_FURTHER_REVIEW
-    reviewer_notes = Column(Text, nullable=True)
-    reviewer_name = Column(String, nullable=True)
-    reviewed_at = Column(DateTime, nullable=True)
+    review_status: Mapped[str] = mapped_column(String, nullable=False, default="PENDING")  # PENDING | REVIEWED
+    human_decision: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # AGREE_WITH_AI | DISAGREE_WITH_AI | NEEDS_FURTHER_REVIEW
+    reviewer_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    reviewer_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     # Timestamps
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
-    updated_at = Column(
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),

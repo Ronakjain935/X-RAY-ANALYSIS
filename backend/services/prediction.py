@@ -18,21 +18,22 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Literal, Optional, Tuple
+from typing import Any, Literal, Optional, Tuple
 
 # Ensure Keras backend is torch before importing keras
 os.environ.setdefault("KERAS_BACKEND", "torch")
 
 from config import settings
+from models.schemas import PredictionType
 
 logger = logging.getLogger("xray_squared.prediction")
 
 # Fixed class mapping
-CLASS_NAMES: dict[int, str] = {0: "NORMAL", 1: "PNEUMONIA"}
+CLASS_NAMES: dict[int, PredictionType] = {0: "NORMAL", 1: "PNEUMONIA"}
 NUM_CLASSES: int = 2
 
 # Global model cache
-_model_cache: dict[str, object] = {
+_model_cache: dict[str, Any] = {
     "model": None,
     "gate_model": None,
     "model_type": None,  # "keras" or "torch"
@@ -354,7 +355,7 @@ def check_xray_gate(tensor, pil_img=None) -> Tuple[bool, float]:
         return True, 1.0
 
 
-def predict(tensor) -> Tuple[str, float, float, float]:
+def predict(tensor) -> Tuple[PredictionType, float, float, float]:
     """Run inference on a preprocessed input tensor.
 
     Returns:
@@ -380,7 +381,7 @@ def predict(tensor) -> Tuple[str, float, float, float]:
             prob_normal = max(0.0, min(1.0, 1.0 - prob_pneumonia))
 
         threshold = float(_model_cache.get("pneumonia_threshold", 0.5))
-        label = CLASS_NAMES[1] if prob_pneumonia >= threshold else CLASS_NAMES[0]
+        label: PredictionType = "PNEUMONIA" if prob_pneumonia >= threshold else "NORMAL"
         return label, round(prob_pneumonia, 4), round(prob_normal, 4), round(prob_pneumonia, 4)
 
     # Standard PyTorch ResNet18 inference
@@ -390,5 +391,5 @@ def predict(tensor) -> Tuple[str, float, float, float]:
         prob_normal = float(probs[0, 0].cpu().item())
         prob_pneumonia = float(probs[0, 1].cpu().item())
 
-    label = CLASS_NAMES[1] if prob_pneumonia >= 0.5 else CLASS_NAMES[0]
-    return label, round(prob_pneumonia, 4), round(prob_normal, 4), round(prob_pneumonia, 4)
+    label_pt: PredictionType = "PNEUMONIA" if prob_pneumonia >= 0.5 else "NORMAL"
+    return label_pt, round(prob_pneumonia, 4), round(prob_normal, 4), round(prob_pneumonia, 4)

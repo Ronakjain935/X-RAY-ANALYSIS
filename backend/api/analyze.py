@@ -164,13 +164,13 @@ def _process_single_image(
     db.refresh(case)
 
     return AnalyzeResponse(
-        case_id=case.case_id,
-        filename=case.filename,
-        prediction=case.prediction,  # type: ignore[arg-type]
-        score=case.score,
-        confidence=case.confidence,  # type: ignore[arg-type]
+        case_id=case_id,
+        filename=filename,
+        prediction=label,
+        score=score,
+        confidence=confidence,
         uncertainty=uncertainty,
-        priority=case.priority,  # type: ignore[arg-type]
+        priority=prio,
         quality=quality,
         probabilities=Probabilities(NORMAL=prob_normal, PNEUMONIA=prob_pneumonia),
         gradcam_url=gradcam_url,
@@ -253,7 +253,7 @@ async def analyze_batch(files: List[UploadFile] = File(...)):
             results.append(
                 BatchAnalyzeItem(
                     filename=f.filename or "upload.jpg",
-                    error=str(e.detail) if e.detail else str(e.status_code),
+                    error=e.detail if e.detail else str(e.status_code),
                 )
             )
             failed += 1

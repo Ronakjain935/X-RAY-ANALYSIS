@@ -4,6 +4,7 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from models.case import Case
+from models.schemas import ConfidenceType
 
 
 def next_case_id(db: Session) -> str:
@@ -13,7 +14,7 @@ def next_case_id(db: Session) -> str:
     return f"XR-{next_num:06d}"
 
 
-def confidence_from_score(score: float, high: float, medium: float) -> str:
+def confidence_from_score(score: float, high: float, medium: float) -> ConfidenceType:
     """Map a model score to HIGH/MEDIUM/LOW using configured thresholds."""
     if score >= high:
         return "HIGH"
