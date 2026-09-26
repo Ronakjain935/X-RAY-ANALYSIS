@@ -56,6 +56,11 @@ class Settings:
     # Upload limit
     MAX_UPLOAD_MB: int = int(os.getenv("MAX_UPLOAD_MB", "10"))
 
+    # Blur / sharpness thresholds (Laplacian variance heuristic)
+    # Prototype heuristic — requires clinical validation on real chest X-rays.
+    BLUR_THRESHOLD_POOR: float = float(os.getenv("BLUR_THRESHOLD_POOR", "30.0"))
+    BLUR_THRESHOLD_WARNING: float = float(os.getenv("BLUR_THRESHOLD_WARNING", "100.0"))
+
     # Server
     HOST: str = os.getenv("HOST", "0.0.0.0")
     PORT: int = int(os.getenv("PORT", "10000"))

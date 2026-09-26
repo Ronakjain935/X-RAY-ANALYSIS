@@ -8,6 +8,7 @@ import type {
   Priority,
   ReviewStatus,
   ReviewDecision,
+  QualityStatus,
 } from "@/lib/types";
 
 export function PredictionBadge({
@@ -143,18 +144,26 @@ export function QualityBadge({
   status,
   className,
 }: {
-  status: "GOOD" | "MODERATE" | "POOR";
+  status: QualityStatus;
   className?: string;
 }) {
-  const styles = {
+  const styles: Record<QualityStatus, string> = {
     GOOD: "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-50 hover:text-emerald-800",
     MODERATE:
       "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-50 hover:text-amber-800",
+    WARNING:
+      "border-amber-300 bg-amber-100 text-amber-900 hover:bg-amber-100 hover:text-amber-900",
     POOR: "border-rose-200 bg-rose-50 text-rose-800 hover:bg-rose-50 hover:text-rose-800",
-  } as const;
+  };
+  const labels: Record<QualityStatus, string> = {
+    GOOD: "Good",
+    MODERATE: "Moderate",
+    WARNING: "Warning",
+    POOR: "Poor",
+  };
   return (
     <Badge className={cn(styles[status], className)}>
-      {status === "GOOD" ? "Good" : status === "MODERATE" ? "Moderate" : "Poor"}
+      {labels[status]}
     </Badge>
   );
 }

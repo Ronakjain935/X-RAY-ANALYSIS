@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 # ---------- Enums ----------
 
@@ -23,11 +23,13 @@ class ImageQuality(BaseModel):
     brightness: QualityStatusType
     contrast: QualityStatusType
     resolution: QualityStatusType
+    sharpness: Optional[QualityStatusType] = None
     # Prototype numeric metrics — useful for the UI to show actual numbers.
     # NOT clinically calibrated.
     brightness_value: Optional[float] = None
     contrast_value: Optional[float] = None
     resolution_value: Optional[str] = None
+    sharpness_value: Optional[float] = None
     note: Optional[str] = None
 
 
@@ -100,9 +102,7 @@ class CaseBrief(BaseModel):
     review_status: ReviewStatusType
     human_decision: Optional[HumanDecisionType] = None
     created_at: datetime
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CaseDetail(CaseBrief):
@@ -114,9 +114,7 @@ class CaseDetail(CaseBrief):
     reviewer_name: Optional[str] = None
     reviewed_at: Optional[datetime] = None
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CaseListResponse(BaseModel):

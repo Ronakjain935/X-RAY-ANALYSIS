@@ -36,6 +36,7 @@ class Case(Base):
     brightness_status: Mapped[str] = mapped_column(String, nullable=False)
     contrast_status: Mapped[str] = mapped_column(String, nullable=False)
     resolution_status: Mapped[str] = mapped_column(String, nullable=False)
+    sharpness_status: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     # Human review
     review_status: Mapped[str] = mapped_column(String, nullable=False, default="PENDING")  # PENDING | REVIEWED

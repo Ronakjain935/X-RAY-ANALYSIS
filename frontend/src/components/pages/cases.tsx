@@ -144,12 +144,24 @@ export function CasesPage({
   };
 
   useEffect(() => {
-    if (isLive) refreshFromBackend();
+    if (isLive) {
+      queueMicrotask(() => {
+        void refreshFromBackend();
+      });
+    }
   }, [isLive]);
 
   // In live mode use backendCases (or empty list while loading);
   // in demo mode use the local store.
-  const cases = isLive ? (backendCases ?? []) : storeCases;
+  const rawCases = isLive ? (backendCases ?? []) : storeCases;
+  const cases = useMemo(() => {
+    const seen = new Set<string>();
+    return rawCases.filter((c) => {
+      if (!c?.caseId || seen.has(c.caseId)) return false;
+      seen.add(c.caseId);
+      return true;
+    });
+  }, [rawCases]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -472,6 +484,7 @@ function CaseDetail({
         {localCase.imageUrl && (
           <GradCamView
             imageUrl={localCase.imageUrl}
+            gradcamUrl={localCase.gradcamUrl}
             prediction={localCase.prediction}
             caseId={localCase.caseId}
             compact

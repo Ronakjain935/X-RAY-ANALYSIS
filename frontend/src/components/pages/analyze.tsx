@@ -119,7 +119,7 @@ export function AnalyzePage() {
               <Cpu className="h-3 w-3" />
               {backendStatus.modelAvailable
                 ? "Trained model loaded — real predictions will be served."
-                : "Backend online but trained model is not available — /api/analyze returns HTTP 503. Place pneumonia_resnet18_best.pth inside backend/trained_models/."}
+                : "Backend online but trained model is not available — /api/analyze returns HTTP 503. Please ensure S_RAY_Pneumonia_Model.keras or pneumonia_resnet18_best.pth is available."}
             </div>
           )}
           {backendStatus?.mode === "demo" &&
@@ -205,7 +205,8 @@ export function AnalyzePage() {
               subtitle="Visualize regions that influenced the prediction."
             >
               <GradCamView
-                imageUrl={active.caseItem.gradcamUrl ?? active.previewUrl}
+                imageUrl={active.previewUrl}
+                gradcamUrl={active.caseItem.gradcamUrl}
                 prediction={active.caseItem.prediction}
                 caseId={active.caseItem.caseId}
               />

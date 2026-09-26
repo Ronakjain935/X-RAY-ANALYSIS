@@ -94,7 +94,11 @@ export function AnalyticsPage() {
   };
 
   useEffect(() => {
-    if (isLive) refresh();
+    if (isLive) {
+      queueMicrotask(() => {
+        void refresh();
+      });
+    }
   }, [isLive]);
 
   // Choose data source: backend summary when live, otherwise local store.

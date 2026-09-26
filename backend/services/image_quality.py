@@ -55,10 +55,49 @@ def _check_contrast(gray: np.ndarray) -> QualityStatus:
     return "GOOD"
 
 
-def _aggregate(brightness: QualityStatus, contrast: QualityStatus, resolution: QualityStatus) -> QualityStatus:
-    """Overall quality = the worst of the three checks."""
+def _check_sharpness(gray: np.ndarray) -> tuple[QualityStatus, float]:
+    """Check image sharpness using Laplacian variance.
+
+    Prototype heuristic:
+      - variance < BLUR_THRESHOLD_POOR -> POOR
+      - variance < BLUR_THRESHOLD_WARNING -> WARNING
+      - else -> GOOD
+
+    NOTE: This is a prototype heuristic. The threshold values must be validated
+    against a clinically verified chest X-ray dataset before any diagnostic use.
+    """
+    try:
+        import cv2
+        lap = cv2.Laplacian(gray.astype(np.float64), cv2.CV_64F)
+        var = float(lap.var())
+    except Exception:
+        # Fallback 2D convolution with 3x3 Laplacian kernel
+        kernel = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]], dtype=np.float32)
+        h, w = gray.shape
+        kh, kw = kernel.shape
+        # Simple valid convolution
+        sub_matrices = np.lib.stride_tricks.sliding_window_view(gray, (kh, kw))
+        lap = np.einsum('ijkl,kl->ij', sub_matrices, kernel)
+        var = float(lap.var())
+
+    if var < settings.BLUR_THRESHOLD_POOR:
+        status: QualityStatus = "POOR"
+    elif var < settings.BLUR_THRESHOLD_WARNING:
+        status = "WARNING"
+    else:
+        status = "GOOD"
+    return status, round(var, 2)
+
+
+def _aggregate(
+    brightness: QualityStatus,
+    contrast: QualityStatus,
+    resolution: QualityStatus,
+    sharpness: QualityStatus,
+) -> QualityStatus:
+    """Overall quality = the worst of the four checks."""
     rank = {"GOOD": 0, "WARNING": 1, "POOR": 2}
-    worst = max(brightness, contrast, resolution, key=lambda s: rank[s])
+    worst = max(brightness, contrast, resolution, sharpness, key=lambda s: rank[s])
     return worst  # type: ignore[return-value]
 
 
@@ -73,7 +112,8 @@ def assess_quality(img: Image.Image) -> ImageQuality:
         brightness = _check_brightness(gray)
         contrast = _check_contrast(gray)
         resolution = _check_resolution(img)
-        status = _aggregate(brightness, contrast, resolution)
+        sharpness, sharpness_value = _check_sharpness(gray)
+        status = _aggregate(brightness, contrast, resolution, sharpness)
 
         # Numeric values for the UI to display.
         brightness_value = round(float(gray.mean()), 2)
@@ -87,16 +127,21 @@ def assess_quality(img: Image.Image) -> ImageQuality:
                 "Human review is recommended."
             )
         elif status == "WARNING":
-            note = "Prototype quality check flagged a minor concern."
+            if sharpness == "WARNING":
+                note = "Image sharpness is borderline; please review fine details carefully."
+            else:
+                note = "Prototype quality check flagged a minor concern."
 
         return ImageQuality(
             status=status,
             brightness=brightness,
             contrast=contrast,
             resolution=resolution,
+            sharpness=sharpness,
             brightness_value=brightness_value,
             contrast_value=contrast_value,
             resolution_value=resolution_value,
+            sharpness_value=sharpness_value,
             note=note,
         )
     except Exception:  # pragma: no cover
@@ -107,4 +152,5 @@ def assess_quality(img: Image.Image) -> ImageQuality:
             brightness="WARNING",
             contrast="WARNING",
             resolution="WARNING",
+            sharpness="WARNING",
         )

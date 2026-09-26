@@ -30,11 +30,13 @@ export interface ImageQuality {
   brightness: QualityStatus;
   contrast: QualityStatus;
   resolution: QualityStatus;
+  sharpness?: QualityStatus;
   visibility?: QualityStatus;
   // Optional numeric metrics from backend (prototype — NOT clinically calibrated)
   brightness_value?: number;
   contrast_value?: number;
   resolution_value?: string;
+  sharpness_value?: number;
   note?: string;
 }
 

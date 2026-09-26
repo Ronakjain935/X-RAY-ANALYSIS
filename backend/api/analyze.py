@@ -52,8 +52,8 @@ def _process_single_image(
             detail={
                 "error": "MODEL_NOT_AVAILABLE",
                 "message": (
-                    "The trained pneumonia model is not available. "
-                    "Please place pneumonia_resnet18_best.pth inside trained_models/."
+                    "The configured pneumonia model could not be loaded or is unavailable. "
+                    "Please ensure the configured model file exists (e.g. S_RAY_Pneumonia_Model.keras or pneumonia_resnet18_best.pth)."
                 ),
             },
         )
@@ -97,7 +97,10 @@ def _process_single_image(
             status_code=503,
             detail={
                 "error": "MODEL_NOT_AVAILABLE",
-                "message": "The trained pneumonia model is not available.",
+                "message": (
+                    "The configured pneumonia model could not be loaded or is unavailable. "
+                    "Please ensure the configured model file exists (e.g. S_RAY_Pneumonia_Model.keras or pneumonia_resnet18_best.pth)."
+                ),
             },
         )
     except Exception as e:
@@ -121,47 +124,76 @@ def _process_single_image(
     prio = priority.compute_priority(label, score, confidence, quality)
 
     # 10. Grad-CAM (best-effort — analysis still succeeds if it fails)
-    gradcam_url: Optional[str] = None
-    gradcam_rel_path: Optional[str] = None
-    case_id = next_case_id(db)
+    heatmap = None
     try:
         heatmap = gradcam.generate_gradcam(
             tensor, target_class_idx=1 if label == "PNEUMONIA" else 0
         )
-        if heatmap is not None:
-            gradcam_filename = f"{case_id}-gradcam.png"
-            gradcam_out = Path(settings.RESULT_DIR) / gradcam_filename
-            gradcam.save_gradcam_overlay(np_image, heatmap, gradcam_out)
-            gradcam_rel_path = str(gradcam_out).replace("\\", "/")
-            gradcam_url = f"/results/{gradcam_filename}"
     except Exception:
         logger.exception("Grad-CAM failed (continuing without it)")
 
-    # 11. Persist the case
+    # 11. Persist the case with bounded retry logic to prevent race conditions on case_id
+    from sqlalchemy.exc import IntegrityError
     from models.case import Case
 
-    case = Case(
-        case_id=case_id,
-        filename=filename,
-        original_image_path=rel_path,
-        gradcam_path=gradcam_rel_path,
-        prediction=label,
-        score=score,
-        confidence=confidence,
-        uncertainty=uncertainty,
-        prob_normal=prob_normal,
-        prob_pneumonia=prob_pneumonia,
-        priority=prio,
-        quality_status=quality.status,
-        brightness_status=quality.brightness,
-        contrast_status=quality.contrast,
-        resolution_status=quality.resolution,
-        review_status="PENDING",
-        reviewer_name=reviewer_name,
-    )
-    db.add(case)
-    db.commit()
-    db.refresh(case)
+    max_retries = 5
+    case: Optional[Case] = None
+    gradcam_url: Optional[str] = None
+    gradcam_rel_path: Optional[str] = None
+    case_id: str = ""
+
+    for attempt in range(max_retries):
+        try:
+            case_id = next_case_id(db)
+            if heatmap is not None:
+                gradcam_filename = f"{case_id}-gradcam.png"
+                gradcam_out = Path(settings.RESULT_DIR) / gradcam_filename
+                gradcam.save_gradcam_overlay(np_image, heatmap, gradcam_out)
+                gradcam_rel_path = str(gradcam_out).replace("\\", "/")
+                gradcam_url = f"/results/{gradcam_filename}"
+
+            case = Case(
+                case_id=case_id,
+                filename=filename,
+                original_image_path=rel_path,
+                gradcam_path=gradcam_rel_path,
+                prediction=label,
+                score=score,
+                confidence=confidence,
+                uncertainty=uncertainty,
+                prob_normal=prob_normal,
+                prob_pneumonia=prob_pneumonia,
+                priority=prio,
+                quality_status=quality.status,
+                brightness_status=quality.brightness,
+                contrast_status=quality.contrast,
+                resolution_status=quality.resolution,
+                sharpness_status=quality.sharpness,
+                review_status="PENDING",
+                reviewer_name=reviewer_name,
+            )
+            db.add(case)
+            db.commit()
+            db.refresh(case)
+            break
+        except IntegrityError as ie:
+            db.rollback()
+            logger.warning(
+                "Case ID collision on %s (attempt %d/%d): %s",
+                case_id,
+                attempt + 1,
+                max_retries,
+                ie,
+            )
+            if attempt == max_retries - 1:
+                logger.error("Failed to persist case after %d retries due to ID collisions", max_retries)
+                raise HTTPException(
+                    status_code=500,
+                    detail={
+                        "error": "DATABASE_ERROR",
+                        "message": "Failed to persist analysis due to concurrent case ID collision. Please retry.",
+                    },
+                )
 
     return AnalyzeResponse(
         case_id=case_id,

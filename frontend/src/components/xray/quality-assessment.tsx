@@ -4,8 +4,8 @@ import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { QualityBadge } from "./badges";
-import { Sun, Contrast, Maximize, Eye, AlertTriangle } from "lucide-react";
-import type { ImageQuality } from "@/lib/types";
+import { Sun, Contrast, Maximize, Eye, AlertTriangle, Activity } from "lucide-react";
+import type { ImageQuality, QualityStatus } from "@/lib/types";
 
 export function QualityAssessment({ quality }: { quality: ImageQuality }) {
   return (
@@ -23,7 +23,7 @@ export function QualityAssessment({ quality }: { quality: ImageQuality }) {
           <QualityBadge status={quality.status} />
         </div>
       </CardHeader>
-      <CardContent className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-4">
+      <CardContent className={cn("grid grid-cols-2 gap-3 p-4", quality.sharpness ? "sm:grid-cols-5" : "sm:grid-cols-4")}>
         <QualityMetric
           icon={Sun}
           label="Brightness"
@@ -39,10 +39,17 @@ export function QualityAssessment({ quality }: { quality: ImageQuality }) {
           label="Resolution"
           status={quality.resolution}
         />
+        {quality.sharpness && (
+          <QualityMetric
+            icon={Activity}
+            label="Sharpness"
+            status={quality.sharpness}
+          />
+        )}
         <QualityMetric
           icon={Eye}
           label="Visibility"
-          status={quality.visibility}
+          status={quality.visibility ?? quality.contrast}
         />
       </CardContent>
 
@@ -66,19 +73,27 @@ function QualityMetric({
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
-  status: "GOOD" | "MODERATE" | "POOR";
+  status?: QualityStatus;
 }) {
-  const styles = {
+  const safeStatus: QualityStatus = status ?? "GOOD";
+  const styles: Record<QualityStatus, string> = {
     GOOD: "border-emerald-200 bg-emerald-50/40 text-emerald-700",
     MODERATE: "border-amber-200 bg-amber-50/40 text-amber-700",
+    WARNING: "border-amber-300 bg-amber-100/50 text-amber-800",
     POOR: "border-rose-200 bg-rose-50/40 text-rose-700",
-  } as const;
+  };
+  const labels: Record<QualityStatus, string> = {
+    GOOD: "Good",
+    MODERATE: "Moderate",
+    WARNING: "Warning",
+    POOR: "Poor",
+  };
 
   return (
     <div
       className={cn(
         "flex flex-col items-start gap-1.5 rounded-lg border p-3",
-        styles[status]
+        styles[safeStatus]
       )}
     >
       <Icon className="h-4 w-4" />
@@ -87,7 +102,7 @@ function QualityMetric({
           {label}
         </span>
         <span className="text-[13px] font-medium">
-          {status === "GOOD" ? "Good" : status === "MODERATE" ? "Moderate" : "Poor"}
+          {labels[safeStatus]}
         </span>
       </div>
     </div>

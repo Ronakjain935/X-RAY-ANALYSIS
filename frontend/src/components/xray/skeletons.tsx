@@ -6,11 +6,17 @@ import { cn } from "@/lib/utils";
  * Reusable skeleton loading primitives.
  * Use these for any async-loaded content (case tables, KPI grids, charts, reports).
  */
-export function Skeleton({ className }: { className?: string }) {
+export function Skeleton({
+  className,
+  style,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cn("shimmer rounded-md", className)}
+      style={style}
       aria-hidden
+      {...props}
     />
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Card,
   CardContent,
@@ -124,11 +124,23 @@ export function DashboardPage() {
   };
 
   useEffect(() => {
-    if (isLive) refresh();
+    if (isLive) {
+      queueMicrotask(() => {
+        void refresh();
+      });
+    }
   }, [isLive]);
 
   // Use backend data when live; fall back to store (demo) otherwise.
-  const cases = isLive ? (backendCases ?? []) : storeCases;
+  const rawCases = isLive ? (backendCases ?? []) : storeCases;
+  const cases = useMemo(() => {
+    const seen = new Set<string>();
+    return rawCases.filter((c) => {
+      if (!c?.caseId || seen.has(c.caseId)) return false;
+      seen.add(c.caseId);
+      return true;
+    });
+  }, [rawCases]);
 
   // KPIs
   const totalCases = isLive && summary ? summary.total_cases : storeCases.length;

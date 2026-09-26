@@ -46,7 +46,7 @@ def compute_priority(
             # Medium score — escalate if quality is poor
             return "HIGH" if poor_quality else "MEDIUM"
         # Low score on a pneumonia-suspected case = uncertain
-        return "MEDIUM" if poor_quality or low_conf else "MEDIUM"
+        return "MEDIUM"
 
     # Normal cases
     if score < settings.MEDIUM_CONFIDENCE_THRESHOLD:

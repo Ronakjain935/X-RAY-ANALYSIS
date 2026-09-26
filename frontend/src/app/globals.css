@@ -167,18 +167,3 @@
   background-image: radial-gradient(circle, oklch(0.88 0.012 256) 1px, transparent 1px);
   background-size: 14px 14px;
 }
-
-/* Grad-CAM scanline effect for demo overlay (no real model needed) */
-.gradcam-demo {
-  background:
-    radial-gradient(ellipse at 45% 55%, rgba(220, 38, 38, 0.65) 0%, rgba(249, 115, 22, 0.55) 25%, rgba(234, 179, 8, 0.45) 45%, rgba(34, 197, 94, 0.30) 65%, rgba(37, 99, 235, 0.20) 80%, transparent 100%),
-    repeating-linear-gradient(0deg, rgba(0,0,0,0.04) 0 2px, transparent 2px 4px);
-  mix-blend-mode: multiply;
-}
-
-.gradcam-cool-demo {
-  background:
-    radial-gradient(ellipse at 50% 50%, rgba(34, 197, 94, 0.30) 0%, rgba(37, 99, 235, 0.20) 40%, transparent 80%),
-    repeating-linear-gradient(0deg, rgba(0,0,0,0.04) 0 2px, transparent 2px 4px);
-  mix-blend-mode: multiply;
-}

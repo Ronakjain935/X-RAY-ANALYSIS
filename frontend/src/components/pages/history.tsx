@@ -111,10 +111,22 @@ export function HistoryPage() {
   };
 
   useEffect(() => {
-    if (isLive) refresh();
+    if (isLive) {
+      queueMicrotask(() => {
+        void refresh();
+      });
+    }
   }, [isLive]);
 
-  const cases = isLive ? (backendCases ?? []) : storeCases;
+  const rawCases = isLive ? (backendCases ?? []) : storeCases;
+  const cases = useMemo(() => {
+    const seen = new Set<string>();
+    return rawCases.filter((c) => {
+      if (!c?.caseId || seen.has(c.caseId)) return false;
+      seen.add(c.caseId);
+      return true;
+    });
+  }, [rawCases]);
 
   const list = useMemo(() => {
     const q = query.trim().toLowerCase();

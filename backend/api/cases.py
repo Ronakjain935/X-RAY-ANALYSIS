@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -20,59 +20,50 @@ router = APIRouter()
 
 
 def _case_to_brief(c: Case) -> CaseBrief:
-    return CaseBrief(
-        case_id=c.case_id,
-        filename=c.filename,
-        prediction=c.prediction,
-        score=c.score,
-        confidence=c.confidence,
-        uncertainty=c.uncertainty,
-        priority=c.priority,
-        review_status=c.review_status,
-        human_decision=c.human_decision,
-        created_at=c.created_at,
-    )
+    return CaseBrief.model_validate(c)
 
 
 def _case_to_detail(c: Case) -> CaseDetail:
+    obj: Any = c
     quality = ImageQuality(
-        status=c.quality_status,
-        brightness=c.brightness_status,
-        contrast=c.contrast_status,
-        resolution=c.resolution_status,
+        status=obj.quality_status,
+        brightness=obj.brightness_status,
+        contrast=obj.contrast_status,
+        resolution=obj.resolution_status,
+        sharpness=getattr(c, "sharpness_status", None),
     )
     probabilities = None
-    if c.prob_normal is not None and c.prob_pneumonia is not None:
+    if obj.prob_normal is not None and obj.prob_pneumonia is not None:
         from models.schemas import Probabilities
 
         probabilities = Probabilities(
-            NORMAL=c.prob_normal, PNEUMONIA=c.prob_pneumonia
+            NORMAL=obj.prob_normal, PNEUMONIA=obj.prob_pneumonia
         )
     gradcam_url = None
-    if c.gradcam_path:
-        gradcam_url = f"/results/{Path(c.gradcam_path).name}"
+    if obj.gradcam_path:
+        gradcam_url = f"/results/{Path(str(obj.gradcam_path)).name}"
     original_url = None
-    if c.original_image_path:
-        original_url = f"/uploads/{Path(c.original_image_path).name}"
+    if obj.original_image_path:
+        original_url = f"/uploads/{Path(str(obj.original_image_path)).name}"
     return CaseDetail(
-        case_id=c.case_id,
-        filename=c.filename,
-        prediction=c.prediction,
-        score=c.score,
-        confidence=c.confidence,
-        uncertainty=c.uncertainty,
-        priority=c.priority,
-        review_status=c.review_status,
-        human_decision=c.human_decision,
-        created_at=c.created_at,
+        case_id=obj.case_id,
+        filename=obj.filename,
+        prediction=obj.prediction,
+        score=obj.score,
+        confidence=obj.confidence,
+        uncertainty=obj.uncertainty,
+        priority=obj.priority,
+        review_status=obj.review_status,
+        human_decision=obj.human_decision,
+        created_at=obj.created_at,
         quality=quality,
         probabilities=probabilities,
         gradcam_url=gradcam_url,
         original_image_url=original_url,
-        reviewer_notes=c.reviewer_notes,
-        reviewer_name=c.reviewer_name,
-        reviewed_at=c.reviewed_at,
-        updated_at=c.updated_at,
+        reviewer_notes=obj.reviewer_notes,
+        reviewer_name=obj.reviewer_name,
+        reviewed_at=obj.reviewed_at,
+        updated_at=obj.updated_at,
     )
 
 

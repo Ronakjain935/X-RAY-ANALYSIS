@@ -65,7 +65,10 @@ export const useAppStore = create<AppState>()(
       selectCase: (caseId) => set({ selectedCaseId: caseId }),
 
       cases: DEMO_CASES,
-      addCase: (c) => set((s) => ({ cases: [c, ...s.cases] })),
+      addCase: (c) =>
+        set((s) => ({
+          cases: [c, ...s.cases.filter((existing) => existing.caseId !== c.caseId)],
+        })),
       updateCase: (caseId, patch) =>
         set((s) => ({
           cases: s.cases.map((c) =>
@@ -122,6 +125,21 @@ export const useAppStore = create<AppState>()(
         settings: s.settings,
         reportIds: s.reportIds,
       }),
+      merge: (persistedState, currentState) => {
+        const state = (persistedState as Partial<AppState>) ?? {};
+        const rawCases = state.cases ?? currentState.cases;
+        const seen = new Set<string>();
+        const uniqueCases = rawCases.filter((c) => {
+          if (!c?.caseId || seen.has(c.caseId)) return false;
+          seen.add(c.caseId);
+          return true;
+        });
+        return {
+          ...currentState,
+          ...state,
+          cases: uniqueCases,
+        };
+      },
     }
   )
 );

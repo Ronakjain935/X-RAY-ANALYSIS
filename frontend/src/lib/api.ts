@@ -40,10 +40,7 @@ import { generateCaseId } from "@/lib/demo-data";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "") || "";
 
-// Mock mode is enabled when no API URL is configured. Once a URL is set,
-// we attempt live requests but fall back to mock on network errors so the
-// demo still works offline (with a clearly-labeled DEMO badge).
-const MOCK_FALLBACK = true;
+// Demo mode is active only when no API URL is configured or backend is in demo mode.
 
 // ---------- Error types ----------
 
@@ -220,15 +217,8 @@ export const api = {
       };
       return _cachedStatus;
     } catch {
-      if (MOCK_FALLBACK) {
-        _cachedStatus = { mode: "demo", reason: "unreachable" };
-        return _cachedStatus;
-      }
-      throw new ApiError(
-        "Backend unreachable. Set NEXT_PUBLIC_API_URL or run FastAPI locally.",
-        0,
-        "NETWORK"
-      );
+      _cachedStatus = { mode: "demo", reason: "unreachable" };
+      return _cachedStatus;
     }
   },
 
@@ -239,10 +229,10 @@ export const api = {
 
   /**
    * Analyze a single chest X-ray image.
-   * Falls back to mock on network error when MOCK_FALLBACK is true.
+   * Real predictions in live mode; throws ApiError / ModelNotAvailableError on failure.
    */
   async analyze(image: File, opts: AnalyzeOptions = {}): Promise<AnalysisResponse> {
-    if (!API_URL || (_cachedStatus?.mode === "demo" && MOCK_FALLBACK)) {
+    if (!API_URL || _cachedStatus?.mode === "demo") {
       return mockAnalyze(image);
     }
 
@@ -258,7 +248,6 @@ export const api = {
         signal: opts.signal,
       });
     } catch (e: any) {
-      if (MOCK_FALLBACK) return mockAnalyze(image);
       throw new ApiError(
         e?.message ?? "Network error while calling /api/analyze",
         0,
@@ -267,11 +256,6 @@ export const api = {
     }
 
     if (!res.ok) {
-      // If the backend is unreachable / errors out, fall back to mock
-      // so the UI is still usable for a demo — but surface a clear note.
-      if (MOCK_FALLBACK && (res.status >= 500 || res.status === 0)) {
-        return mockAnalyze(image);
-      }
       throw await parseError(res);
     }
     return (await res.json()) as AnalysisResponse;
@@ -284,7 +268,7 @@ export const api = {
     images: File[],
     opts: AnalyzeOptions = {}
   ): Promise<BatchAnalysisResponse> {
-    if (!API_URL || (_cachedStatus?.mode === "demo" && MOCK_FALLBACK)) {
+    if (!API_URL || _cachedStatus?.mode === "demo") {
       const results = await Promise.all(
         images.map(async (file) => {
           try {

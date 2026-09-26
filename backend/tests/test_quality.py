@@ -60,3 +60,26 @@ def test_low_contrast_image_flagged():
     img = Image.fromarray(arr, mode="RGB")
     q = assess_quality(img)
     assert q.contrast == "POOR"
+
+
+def test_blurred_image_flagged():
+    """Verify that an intentionally blurred image produces WARNING or POOR sharpness."""
+    from PIL import ImageFilter
+    img = _make_image(size=(512, 512), color=128, noise=25)
+    blurred = img.filter(ImageFilter.GaussianBlur(radius=10))
+    q = assess_quality(blurred)
+    assert q.sharpness in ("WARNING", "POOR")
+    assert q.sharpness_value is not None
+
+
+def test_sharp_image_good_sharpness():
+    """Verify that a sharp high-contrast textured image achieves GOOD sharpness."""
+    # Alternating high-frequency pattern creates high Laplacian variance
+    arr = np.zeros((512, 512), dtype=np.uint8)
+    arr[::4, :] = 255
+    arr[:, ::4] = 255
+    img = Image.fromarray(arr, mode="L").convert("RGB")
+    q = assess_quality(img)
+    assert q.sharpness == "GOOD"
+    assert q.sharpness_value is not None
+    assert q.sharpness_value > 100.0
