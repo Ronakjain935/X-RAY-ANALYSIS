@@ -34,6 +34,10 @@ backend/uploads/*
 !backend/uploads/.gitkeep
 backend/results/*
 !backend/results/.gitkeep
+uploads/*
+!uploads/.gitkeep
+results/*
+!results/.gitkeep
 
 # Logs
 *.log

@@ -12,20 +12,24 @@ from typing import Optional
 import numpy as np
 from PIL import Image
 
-from config import settings
 from . import prediction
 
 logger = logging.getLogger("xray_squared.gradcam")
 
 
-def _find_target_layer(model) -> str:
-    """Find the last convolutional layer name in ResNet18.
+def _find_target_layer(model, is_keras: bool = False):
+    """Find the target convolutional layer for Grad-CAM.
 
-    For ResNet18 this is layer4[-1].conv2 — we register a forward hook on it.
+    For Keras EfficientNetB0, target 'top_activation' (or penultimate layer).
+    For ResNet18, target 'layer4[-1]' (the last residual block).
     """
-    # We use model.layer4[-1] as the hook target (the last residual block)
-    # which gives clean CAMs at the deepest spatial resolution.
-    return "layer4"
+    if is_keras:
+        try:
+            eff = model.get_layer("efficientnetb0")
+            return eff.get_layer("top_activation")
+        except Exception:
+            return model.layers[-3] if len(model.layers) >= 3 else model.layers[-1]
+    return model.layer4[-1]
 
 
 def generate_gradcam(
@@ -38,7 +42,8 @@ def generate_gradcam(
 
     Args:
         input_tensor: preprocessed (1, 224, 224, 3) or (1, 3, 224, 224) tensor
-        target_class_idx: class index (0=NORMAL, 1=PNEUMONIA).
+        target_class_idx: class index (0=NORMAL, 1=PNEUMONIA). If None, inferred
+            from model prediction.
 
     Returns:
         heatmap as a (224, 224) float32 array in [0, 1], or None on failure.
@@ -52,8 +57,11 @@ def generate_gradcam(
 
     model = prediction._model_cache["model"]
     device = prediction._model_cache["device"]
-    input_tensor = input_tensor.to(device).clone().detach().requires_grad_(True)
 
+    if not isinstance(input_tensor, torch.Tensor):
+        input_tensor = torch.from_numpy(np.asarray(input_tensor, dtype=np.float32))
+
+    input_tensor = input_tensor.to(device).clone().detach().requires_grad_(True)
     is_keras = prediction.is_keras_model()
 
     # Hook storage
@@ -66,22 +74,20 @@ def generate_gradcam(
     def backward_hook(_module, _grad_input, _grad_output):
         gradients["value"] = _grad_output[0]
 
-    if is_keras:
-        try:
-            eff = model.get_layer("efficientnetb0")
-            target_layer = eff.get_layer("top_activation")
-        except Exception:
-            # Fallback layer discovery for Keras model
-            target_layer = model.layers[-3] if len(model.layers) >= 3 else model.layers[-1]
-    else:
-        target_layer = model.layer4[-1]
-
-    h_fwd = target_layer.register_forward_hook(forward_hook)
-    h_bwd = target_layer.register_full_backward_hook(backward_hook)
+    target_layer = _find_target_layer(model, is_keras=is_keras)
+    h_fwd = None
+    h_bwd = None
 
     try:
+        h_fwd = target_layer.register_forward_hook(forward_hook)
+        h_bwd = target_layer.register_full_backward_hook(backward_hook)
+
         if is_keras:
             output = model(input_tensor)  # (1, 1) sigmoid score
+            if target_class_idx is None:
+                thresh = float(prediction._model_cache.get("pneumonia_threshold", 0.5))
+                target_class_idx = 1 if float(output[0, 0].item()) >= thresh else 0
+
             model.zero_grad()
             if target_class_idx == 0:
                 # Target NORMAL
@@ -125,17 +131,19 @@ def generate_gradcam(
         else:
             cam = np.zeros_like(cam)
 
-        # Resize to input size (224x224)
+        # Resize to input size (224x224) using modern Pillow Resampling filter
         cam_img = Image.fromarray((np.clip(cam, 0, 1) * 255).astype(np.uint8))
-        cam_img = cam_img.resize((224, 224), Image.BILINEAR)
+        cam_img = cam_img.resize((224, 224), Image.Resampling.BILINEAR)
         cam = np.array(cam_img).astype(np.float32) / 255.0
         return cam
     except Exception:
         logger.exception("Grad-CAM generation failed")
         return None
     finally:
-        h_fwd.remove()
-        h_bwd.remove()
+        if h_fwd is not None:
+            h_fwd.remove()
+        if h_bwd is not None:
+            h_bwd.remove()
 
 
 def save_gradcam_overlay(
@@ -146,7 +154,7 @@ def save_gradcam_overlay(
     """Save a Grad-CAM overlay image to disk.
 
     Args:
-        original_np: (224, 224, 3) uint8 RGB original (resized)
+        original_np: (224, 224, 3) uint8 RGB original (or grayscale/any size)
         heatmap: (224, 224) float32 in [0, 1]
         output_path: where to save the PNG
 
@@ -154,14 +162,28 @@ def save_gradcam_overlay(
     """
     import cv2
 
-    # Apply OpenCV JET colormap — red = high influence, blue = low
-    heatmap_uint8 = (heatmap * 255).astype(np.uint8)
+    # Ensure heatmap is 2D uint8
+    heatmap_uint8 = (np.clip(heatmap, 0, 1) * 255).astype(np.uint8)
     heatmap_color = cv2.applyColorMap(heatmap_uint8, cv2.COLORMAP_JET)
-    # cv2 returns BGR — convert to RGB
     heatmap_color = cv2.cvtColor(heatmap_color, cv2.COLOR_BGR2RGB)
 
+    base = original_np.copy()
+    if base.dtype != np.uint8:
+        base = np.clip(base, 0, 255).astype(np.uint8)
+
+    # Convert grayscale to 3-channel RGB if needed
+    if len(base.shape) == 2:
+        base = cv2.cvtColor(base, cv2.COLOR_GRAY2RGB)
+    elif len(base.shape) == 3 and base.shape[2] == 1:
+        base = cv2.cvtColor(base, cv2.COLOR_GRAY2RGB)
+
+    # Match base spatial dimensions to heatmap if they differ
+    h_h, h_w = heatmap_color.shape[:2]
+    if base.shape[:2] != (h_h, h_w):
+        base = cv2.resize(base, (h_w, h_h), interpolation=cv2.INTER_AREA)
+
     # Blend with original (50/50)
-    overlay = cv2.addWeighted(original_np, 0.5, heatmap_color, 0.5, 0)
+    overlay = cv2.addWeighted(base, 0.5, heatmap_color, 0.5, 0)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     Image.fromarray(overlay).save(str(output_path), format="PNG")
