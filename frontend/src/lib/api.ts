@@ -62,6 +62,90 @@ export class ModelNotAvailableError extends ApiError {
   }
 }
 
+// ---------- Radiographic validation helpers ----------
+
+/**
+ * Radiographic pre-validation: checks that the image has monochromatic/radiographic
+ * characteristics (genuine chest X-rays have near-zero color saturation).
+ */
+export async function validateImageRadiographyClient(
+  file: File
+): Promise<{ isXray: boolean; reason?: string }> {
+  return new Promise((resolve) => {
+    if (typeof window === "undefined") {
+      resolve({ isXray: true });
+      return;
+    }
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      try {
+        const canvas = document.createElement("canvas");
+        const size = 64;
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve({ isXray: true });
+          return;
+        }
+        ctx.drawImage(img, 0, 0, size, size);
+        const data = ctx.getImageData(0, 0, size, size).data;
+        let colorDiffSum = 0;
+        let graySum = 0;
+        const totalPixels = size * size;
+
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          colorDiffSum += Math.abs(r - g) + Math.abs(r - b) + Math.abs(g - b);
+          graySum += (r + g + b) / 3;
+        }
+
+        const avgColorDiff = colorDiffSum / (totalPixels * 3);
+        const meanGray = graySum / totalPixels;
+
+        // Chest X-rays are monochromatic radiographs.
+        // Color photographs, scenery, selfies produce high color deviation.
+        if (avgColorDiff > 12) {
+          resolve({
+            isXray: false,
+            reason: "Color photo or non-radiographic image detected",
+          });
+          return;
+        }
+
+        // Contrast and density check (reject flat blank or solid documents)
+        let varianceSum = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          const g = (data[i] + data[i + 1] + data[i + 2]) / 3;
+          varianceSum += Math.pow(g - meanGray, 2);
+        }
+        const stdDev = Math.sqrt(varianceSum / totalPixels);
+
+        if (stdDev < 15 || meanGray > 238 || meanGray < 12) {
+          resolve({
+            isXray: false,
+            reason: "Image lacks radiographic density variation",
+          });
+          return;
+        }
+
+        resolve({ isXray: true });
+      } catch {
+        resolve({ isXray: true });
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve({ isXray: true });
+    };
+    img.src = url;
+  });
+}
+
 // ---------- Mock helpers (DEMO mode only) ----------
 
 function sleep(ms: number) {
@@ -81,6 +165,15 @@ function derivePriority(score: number, confidence: string) {
 }
 
 async function mockAnalyze(file: File): Promise<AnalysisResponse> {
+  const xrayCheck = await validateImageRadiographyClient(file);
+  if (!xrayCheck.isXray) {
+    throw new ApiError(
+      `Uploaded image is not a valid chest X-ray (${xrayCheck.reason}). Only chest X-ray radiographs are accepted for analysis.`,
+      400,
+      "NOT_AN_XRAY"
+    );
+  }
+
   await sleep(1200 + Math.random() * 900);
 
   const seedStr = `${file.name}:${file.size}`;
@@ -232,6 +325,15 @@ export const api = {
    * Real predictions in live mode; throws ApiError / ModelNotAvailableError on failure.
    */
   async analyze(image: File, opts: AnalyzeOptions = {}): Promise<AnalysisResponse> {
+    const xrayCheck = await validateImageRadiographyClient(image);
+    if (!xrayCheck.isXray) {
+      throw new ApiError(
+        `Uploaded image is not a valid chest X-ray (${xrayCheck.reason}). Only chest X-ray radiographs are accepted for analysis.`,
+        400,
+        "NOT_AN_XRAY"
+      );
+    }
+
     if (!API_URL || _cachedStatus?.mode === "demo") {
       return mockAnalyze(image);
     }
